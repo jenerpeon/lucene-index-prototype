@@ -75,7 +75,7 @@ public class Indexer {
         return new String(encoded, encoding);
     }
 
-    // capsulate this, to call new writer for every document to add. Always based on latest Index
+    // capsulate indexWriter, to call new writer for every document to add. Always based on latest Index
     private IndexWriter InitWriter() throws IOException {
         Path Index = new java.io.File(this.IndexLocation).toPath();
             dir = FSDirectory.open(Index);
@@ -96,10 +96,6 @@ public class Indexer {
                 indexFileWithIndexWriter(indexWriter, file , suffix);
             }
         }
-    }
-    // does yaml file match pojo?
-    private boolean validate(File file){
-       return true;
     }
 
     // called by indexDirectory: adds file to Index
@@ -131,15 +127,10 @@ public class Indexer {
         Document doc = new Document();
         Map<String, List<String>> config = readYamlFile(file);
 
-//
         for(String attr : config.keySet()){
             List<String> lst = config.get(attr);
-//            System.out.println(attr+lst.toString().replace("[","").replace("]",""));
-
             doc.add(new Field(attr, lst.toString().replace("[","").replace("]",""), TextField.TYPE_STORED));
         }
-//        Field acl = new Field("acl", stracl, TextField.TYPE_STORED);
-//        doc.add(new Field(file.getAbsolutePath(), readFile(file.getAbsolutePath(), Charset.defaultCharset()), TextField.TYPE_STORED));
 
         return doc;
     }
@@ -150,7 +141,6 @@ public class Indexer {
         try {
             iwriter = InitWriter();
             indexDirectory(iwriter, new File(docDir), "yml" );
-//            iwriter.commit();
         }catch (IOException e){
             System.out.println("Indexer failed:"+e.getMessage());
         }finally {
