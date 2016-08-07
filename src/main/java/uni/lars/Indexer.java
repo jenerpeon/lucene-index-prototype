@@ -1,13 +1,13 @@
 package uni.lars;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
-import com.fasterxml.jackson.dataformat.yaml.snakeyaml.Yaml;
-import com.fasterxml.jackson.dataformat.yaml.snakeyaml.constructor.Constructor;
+import com.fasterxml.jackson.annotation.*;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
+import org.apache.lucene.document.Field;
+import org.apache.lucene.document.TextField;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.store.Directory;
@@ -17,8 +17,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.file.*;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Created by lars on 8/5/16.
@@ -27,49 +26,45 @@ public class Indexer {
 
     public static String IndexLocation = "index";
     public static String docDir = "documents";
+    public static String corrupt = "corrupt";
+
     Directory dir;
     boolean debug;
 
-    private class YamlFile{
 
-        private String pkg;
+    // deserialize yaml file and return Map of Attributes
+    private Map<String, List<String>> readYamlFile(final File file) throws IOException {
+        Map<String, List<String>> config = new HashMap<String, List<String>>();
 
-        private String cls;
+        YAMLMapper o = new YAMLMapper();
 
-        private List<String> tags;
-
-        public String getPkg(){
-            return pkg;
-        }
-        public String getCls(){
-            return cls;
-        }
-        public List<String> getTags(){
-            return tags;
-        }
-        public void setPkg(String pkg){
-            this.pkg = pkg;
-        }
-        public void setCls(String cls){
-            this.cls = cls;
-        }
-        public void setTags(List<String> tags){
-            this.tags = tags;
-        }
-    }
-
-    // read YamlFile and return Yaml file object
-    private YamlFile readYamlFile(final File file) throws IOException {
-        Yaml yaml = new Yaml();
-        Constructor classConstructor = new Constructor(YamlFile.class);
         try {
-            Map<String, Object> map = (Map<String, Object>) yaml.load(readFile(file.getPath(), Charset.defaultCharset()));
-//            System.out.println(file.getName().toString());
-//            System.out.println(map.keySet());
-        }catch(Exception e) {
-            if(debug) System.out.println("Unable to parse Yaml File:"+file.getCanonicalPath().toString());
-//        final YAMLMapper mapper = new YAMLMapper();
-//        return mapper.readValue(file, YamlFile.class);
+            JsonNode node = o.readTree(file);
+
+            for (Iterator<Map.Entry<String, JsonNode>> n = node.fields(); n.hasNext(); ) {
+                Map.Entry<String, JsonNode> current = n.next();
+                if(current.getValue().isTextual()){
+                    config.put(current.getKey(), Arrays.asList(current.getValue().textValue()));
+                    continue;
+                }
+                List<String> lst = new ArrayList<String>();
+                for (Iterator<String> subn = current.getValue().fieldNames(); subn.hasNext(); ) {
+                    lst.add(subn.next());
+                }
+                config.put(current.getKey(), lst);
+            }
+
+            return config;
+
+        } catch (IOException e) {
+            // Copy file to corrupt
+            Path full_corrupt = new File(corrupt+"/"+file.getName()).toPath().toAbsolutePath();
+            System.out.println("unable to store Device Data:"+
+                    file.getAbsolutePath()+
+                    "\n saving to: "+
+                    full_corrupt.toString());
+            Files.copy(file.toPath().toAbsolutePath(), full_corrupt, StandardCopyOption.REPLACE_EXISTING);
+            Files.delete(file.toPath().toAbsolutePath());
         }
         return null;
     }
@@ -102,6 +97,10 @@ public class Indexer {
             }
         }
     }
+    // does yaml file match pojo?
+    private boolean validate(File file){
+       return true;
+    }
 
     // called by indexDirectory: adds file to Index
     private void indexFileWithIndexWriter(IndexWriter indexWriter, File file, String suffix) throws IOException{
@@ -125,41 +124,45 @@ public class Indexer {
             return;
         }
         if(debug) System.out.println("Indexing file"+ file.getCanonicalPath().toString());
-
         indexWriter.addDocument(documentParser(file));
     }
 
     private Document documentParser(File file) throws IOException {
         Document doc = new Document();
-        String text = readFile(file.getCanonicalPath(), Charset.defaultCharset());
-        readYamlFile(file);
+        Map<String, List<String>> config = readYamlFile(file);
 
-//        System.out.println(bean.toString());
 //
-//        Field id = new Field("id", strid, TextField.TYPE_STORED);
-//        Field parent = new Field("parent", strparent, TextField.TYPE_STORED);
-//        Field cls = new Field("class", strclass, TextField.TYPE_STORED);
-//        Field tags = new Field("tags", strtags, TextField.TYPE_STORED);
+        for(String attr : config.keySet()){
+            List<String> lst = config.get(attr);
+//            System.out.println(attr+lst.toString().replace("[","").replace("]",""));
+
+            doc.add(new Field(attr, lst.toString().replace("[","").replace("]",""), TextField.TYPE_STORED));
+        }
 //        Field acl = new Field("acl", stracl, TextField.TYPE_STORED);
-//
-//        List<Field> fields = Arrays.asList(id, parent, cls, acl);
-//
-//        for(Field field : fields){
-//            doc.add(field);
-//        }
+//        doc.add(new Field(file.getAbsolutePath(), readFile(file.getAbsolutePath(), Charset.defaultCharset()), TextField.TYPE_STORED));
 
         return doc;
-
     }
 
     public Indexer(boolean debug) {
         this.debug = debug;
+        IndexWriter iwriter = null;
         try {
-            IndexWriter iwriter = InitWriter();
+            iwriter = InitWriter();
             indexDirectory(iwriter, new File(docDir), "yml" );
-            iwriter.close();
+//            iwriter.commit();
         }catch (IOException e){
             System.out.println("Indexer failed:"+e.getMessage());
+        }finally {
+            if (iwriter != null) {
+                try {
+                   iwriter.close();
+                } catch (IOException e) {
+                   if(iwriter.isOpen())
+                       System.out.println("still open writer");
+                    e.printStackTrace();
+                }
+            }
         }
     }
 }
