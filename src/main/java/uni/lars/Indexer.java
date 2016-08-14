@@ -1,8 +1,5 @@
 package uni.lars;
 
-import com.fasterxml.jackson.annotation.*;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
@@ -12,10 +9,10 @@ import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.store.RAMDirectory;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.Charset;
 import java.nio.file.*;
 import java.util.*;
 
@@ -24,135 +21,140 @@ import java.util.*;
  */
 public class Indexer {
 
-    public static String IndexLocation = "index";
-    public static String docDir = "documents";
-    public static String corrupt = "corrupt";
+    public static String IndexLocation = "/tmp/index";
+    public static String docDir = "/tmp/JsonDocuments";
 
-    Directory dir;
+    public static Directory dir;
     boolean debug;
 
+    // capsulate indexWriter, to call new writer for every document to add. Always based on latest Index
+    private IndexWriter InitPersistentWriter() throws IOException {
+        Path Index = new java.io.File(this.IndexLocation).toPath();
+        dir = FSDirectory.open(Index);
+        Analyzer analyzer = new StandardAnalyzer();
+        IndexWriterConfig iwc = new IndexWriterConfig(analyzer);
+        return new IndexWriter(dir, iwc);
 
-    // deserialize yaml file and return Map of Attributes
-    private Map<String, List<String>> readYamlFile(final File file) throws IOException {
-        Map<String, List<String>> config = new HashMap<String, List<String>>();
-
-        YAMLMapper o = new YAMLMapper();
-
-        try {
-            JsonNode node = o.readTree(file);
-
-            for (Iterator<Map.Entry<String, JsonNode>> n = node.fields(); n.hasNext(); ) {
-                Map.Entry<String, JsonNode> current = n.next();
-                if(current.getValue().isTextual()){
-                    config.put(current.getKey(), Arrays.asList(current.getValue().textValue()));
-                    continue;
-                }
-                List<String> lst = new ArrayList<String>();
-                for (Iterator<String> subn = current.getValue().fieldNames(); subn.hasNext(); ) {
-                    lst.add(subn.next());
-                }
-                config.put(current.getKey(), lst);
-            }
-
-            return config;
-
-        } catch (IOException e) {
-            // Copy file to corrupt
-            Path full_corrupt = new File(corrupt+"/"+file.getName()).toPath().toAbsolutePath();
-            System.out.println("unable to store Device Data:"+
-                    file.getAbsolutePath()+
-                    "\n saving to: "+
-                    full_corrupt.toString());
-            Files.copy(file.toPath().toAbsolutePath(), full_corrupt, StandardCopyOption.REPLACE_EXISTING);
-            Files.delete(file.toPath().toAbsolutePath());
-        }
-        return null;
-    }
-
-    // read file and return content as String
-    static String readFile(String path, Charset encoding) throws IOException{
-        byte[] encoded = Files.readAllBytes(Paths.get(path));
-        return new String(encoded, encoding);
     }
 
     // capsulate indexWriter, to call new writer for every document to add. Always based on latest Index
-    private IndexWriter InitWriter() throws IOException {
-        Path Index = new java.io.File(this.IndexLocation).toPath();
-            dir = FSDirectory.open(Index);
-            Analyzer analyzer = new StandardAnalyzer();
-            IndexWriterConfig iwc = new IndexWriterConfig(analyzer);
-            return new IndexWriter(dir, iwc);
+    private IndexWriter InitVolatileWriter() throws IOException {
+        this.dir = new RAMDirectory();
+        Analyzer analyzer = new StandardAnalyzer();
+        IndexWriterConfig iwc = new IndexWriterConfig(analyzer);
+        return new IndexWriter(dir, iwc);
 
     }
-
-    // index directory recursively
-    private void indexDirectory(IndexWriter indexWriter, File dataDir, String suffix) throws IOException{
-        File[] docs = dataDir.listFiles();
-
-        for(File file : docs){
+    // read JsonDocuments
+    public List<Document> retrieveJsonDocuments(File dataDir, JsonDocReader p){
+        File[] docs = dataDir.getAbsoluteFile().listFiles();
+        ArrayList<Document> lst = new ArrayList<>();
+//        assert(dataDir.isDirectory());
+//        System.out.println(dataDir.toString());
+        for(File file: dataDir.listFiles()){
             if(file.isDirectory()){
-                indexDirectory(indexWriter, file, suffix);
-            }else{
-                indexFileWithIndexWriter(indexWriter, file , suffix);
+                continue;
+            } else{
+                lst.add(p.getDocument(file));
             }
         }
+        return lst;
     }
 
-    // called by indexDirectory: adds file to Index
-    private void indexFileWithIndexWriter(IndexWriter indexWriter, File file, String suffix) throws IOException{
-        if(file.isHidden() || file.isDirectory() || !file.canRead() || !file.exists()){
-            if(debug) System.out.println("no such file:"+file.getCanonicalPath().toString());
-            return;
-        }
-        if(suffix != null && !file.getName().endsWith(suffix)){
-            if(debug) System.out.println("no suitable file with suffix:"+suffix+":"+file.getCanonicalPath().toString());
-            return;
-        }
+    // prepare indexable documents
+    private List<Document> retrieveDocuments(ArrayList<Document> documents, YamlParser yparser, File dataDir, String suffix) throws IOException {
+        File[] docs = dataDir.getAbsoluteFile().listFiles();
+        for (File file : docs) {
+            if (file.isDirectory()) {
+                retrieveDocuments(documents, yparser, file.getAbsoluteFile(), suffix);
+            } else {
 
-        if(suffix != null && file.getName().endsWith("tag.en."+suffix) ||
-                file.getName().endsWith("tag.de."+suffix) ||
-                file.getName().endsWith("errors.en."+suffix) ||
-                file.getName().endsWith("errors.de."+suffix) ||
-                file.getName().endsWith("meta."+suffix) ||
-                file.getName().endsWith("meta.de."+suffix) ||
-                file.getName().endsWith("meta.en."+suffix) )
-        {
-            return;
-        }
-        if(debug) System.out.println("Indexing file"+ file.getCanonicalPath().toString());
-        indexWriter.addDocument(documentParser(file));
-    }
-
-    private Document documentParser(File file) throws IOException {
-        Document doc = new Document();
-        Map<String, List<String>> config = readYamlFile(file);
-
-        for(String attr : config.keySet()){
-            List<String> lst = config.get(attr);
-            doc.add(new Field(attr, lst.toString().replace("[","").replace("]",""), TextField.TYPE_STORED));
-        }
-
-        return doc;
-    }
-
-    public Indexer(boolean debug) {
-        this.debug = debug;
-        IndexWriter iwriter = null;
-        try {
-            iwriter = InitWriter();
-            indexDirectory(iwriter, new File(docDir), "yml" );
-        }catch (IOException e){
-            System.out.println("Indexer failed:"+e.getMessage());
-        }finally {
-            if (iwriter != null) {
-                try {
-                   iwriter.close();
-                } catch (IOException e) {
-                   if(iwriter.isOpen())
-                       System.out.println("still open writer");
-                    e.printStackTrace();
+                if (file.isHidden() || file.isDirectory() || !file.canRead() || !file.exists()) {
+                    if (debug) System.out.println("no such file:" + file.getCanonicalPath().toString());
+                    continue;
                 }
+                if (suffix != null && !file.getName().endsWith(suffix)) {
+                    if (debug)
+                        System.out.println("no suitable file with suffix:" + suffix + ":" + file.getCanonicalPath().toString());
+                    continue;
+                }
+
+                if (suffix != null && file.getName().endsWith("tag.en." + suffix) ||
+                        file.getName().endsWith("tag.de." + suffix) ||
+                        file.getName().endsWith("errors.en." + suffix) ||
+                        file.getName().endsWith("errors.de." + suffix) ||
+                        file.getName().endsWith("meta." + suffix) ||
+                        file.getName().endsWith("meta.de." + suffix) ||
+                        file.getName().endsWith("meta.en." + suffix))
+                    continue;
+
+                if (debug) System.out.println("Indexing file" + file.getCanonicalPath().toString());
+
+                Map<String, List<String>> config = yparser.readYamlFile(file);
+                Document doc = new Document();
+                for (String attr : config.keySet()) {
+                    List<String> lst = config.get(attr);
+                    doc.add(new Field(attr, lst.toString()
+                            .replace("[", "")
+                            .replace("]", "")
+                            .replace(".", " ")
+                            , TextField.TYPE_STORED));
+                }
+                documents.add(doc);
             }
         }
+        return documents;
+    }
+
+    private void indexdocs(IndexWriter iwriter, List<Document> documents) throws IOException {
+        iwriter.addDocuments(documents);
+    }
+
+    public Indexer(){
+
+    }
+    public Indexer(boolean init) {
+        Measure m1 = new Measure("inline file reading and document creation");
+        Measure m2 = new Measure("inline indexing");
+        Measure m3 = new Measure("inline all");
+        m3.start();
+        if (init) {
+            try {
+                m1.start();
+                IndexWriter iwriter = InitPersistentWriter();
+//                List<Document> documents = retrieveDocuments(new ArrayList<Document>(), new YamlParser(), new File(docDir), "yml");
+
+                List<Document> documents = retrieveJsonDocuments(new File(docDir), new JsonDocReader());
+                m1.end();
+                m2.start();
+                indexdocs(iwriter, documents);
+                m2.end();
+                iwriter.close();
+
+            } catch (IOException e) {
+                System.out.println("Indexer failed:" + e.getMessage());
+            }
+        }
+        m3.end();
+    }
+
+    public void clean() {
+        File root = new File(IndexLocation).getAbsoluteFile();
+        try {
+            clean_wrapped(root);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void clean_wrapped(File f) throws IOException {
+
+        for (File file : f.listFiles()) {
+            if (file.isDirectory()) {
+                clean_wrapped(file);
+            }
+            Files.delete(file.toPath().toAbsolutePath());
+        }
+
     }
 }

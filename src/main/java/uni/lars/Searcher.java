@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * Created by lars on 8/5/16.
@@ -28,37 +29,42 @@ public class Searcher{
     QueryParser parser;
     ArrayList<String> fields;
 
-    private void lookString(String text) throws ParseException, QueryNodeException, IOException, org.apache.lucene.queryparser.classic.ParseException {
+    private List<Document> lookString(String text) throws ParseException, QueryNodeException, IOException, org.apache.lucene.queryparser.classic.ParseException {
+        List<Document> results = new ArrayList<>();
         for(String field : fields) {
             parser = new QueryParser(field, analyzer);
             Query query = parser.parse(text);
-            System.out.println("Results:"+indexSearcher.count(query));
+//            System.out.println("Results "+field.toString()+":"+indexSearcher.count(query));
             ScoreDoc[] hits = indexSearcher.search(query, 10).scoreDocs;
             for (int i = 0; i < hits.length; i++) {
                 Document hitDoc = indexSearcher.doc(hits[i].doc);
-                System.out.println("Hit:" + hitDoc.get(field));
+                results.add(hitDoc);
+//                System.out.println("Hit:" + hitDoc.get(field));
             }
         }
+        return results;
     }
 
-    public boolean lookup(String text){
+    public List<Document> lookup(String text){
         try{
-            lookString(text);
-            return true;
+            return lookString(text);
+//            return true;
         }catch (Exception e){
             System.out.println("lookup failed:"+e.getMessage());
-            return false;
+            return null;
+//            return false;
         }
     }
 
     private void init() throws IOException {
         this.analyzer = new StandardAnalyzer();
-        Path Index = new java.io.File(Indexer.IndexLocation).toPath();
-        IndexReader indexReader = DirectoryReader.open(FSDirectory.open(Index));
+        Path Index = new java.io.File(Indexer.IndexLocation).toPath().toAbsolutePath();
+//        IndexReader indexReader = DirectoryReader.open(FSDirectory.open(Index));
+        IndexReader indexReader = DirectoryReader.open(Indexer.dir);
         this.indexSearcher = new IndexSearcher(indexReader);
 
         fields = new ArrayList<String>();
-        fields.addAll(Arrays.asList("Package", "Parent", "Tags"));
+        fields.addAll(Arrays.asList("package", "parent", "tags","guids","acls"));
     }
 
     public Searcher(){
