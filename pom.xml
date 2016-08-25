@@ -13,12 +13,12 @@
     <url>http://maven.apache.org</url>
 
     <properties>
-        <vaadin.version>7.6.2</vaadin.version>
+        <vaadin.version>7.6.8</vaadin.version>
         <vaadin.plugin.version>${vaadin.version}</vaadin.plugin.version>
         <jetty.plugin.version>9.2.3.v20140905</jetty.plugin.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.compiler.source>1.8</maven.compiler.source>
-        <maven.compiler.target>1.8</maven.compiler.target>
+        <project.source.version>1.8</project.source.version>
+        <project.target.version>1.8</project.target.version>
     </properties>
 
     <repositories>
@@ -51,13 +51,6 @@
     </dependencyManagement>
 
     <dependencies>
-        <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
-            <version>3.8.1</version>
-            <scope>test</scope>
-        </dependency>
-
         <dependency>
             <groupId>org.apache.lucene</groupId>
             <artifactId>lucene-core</artifactId>
@@ -92,32 +85,24 @@
             <artifactId>jackson-databind</artifactId>
             <version>2.6.3</version>
         </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-            <version>2.6.3</version>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-            <version>2.6.3</version>
-        </dependency>
-        <dependency>
-            <groupId>rocks.xmpp</groupId>
-            <artifactId>xmpp-core-client</artifactId>
-            <version>0.7.0</version>
-        </dependency>
-        <dependency>
-            <groupId>rocks.xmpp</groupId>
-            <artifactId>xmpp-extensions-client</artifactId>
-            <version>0.7.0</version>
-        </dependency>
 
-        <!-- https://mvnrepository.com/artifact/io.fabric8/docker-maven-plugin -->
+        <!--<dependency>-->
+        <!--<groupId>rocks.xmpp</groupId>-->
+        <!--<artifactId>xmpp-core-client</artifactId>-->
+        <!--<version>0.7.0</version>-->
+        <!--</dependency>-->
+        <!--<dependency>-->
+        <!--<groupId>rocks.xmpp</groupId>-->
+        <!--<artifactId>xmpp-extensions-client</artifactId>-->
+        <!--<version>0.7.0</version>-->
+        <!--</dependency>-->
+
+        <!--https://mvnrepository.com/artifact/io.fabric8/docker-maven-plugin-->
         <dependency>
             <groupId>io.fabric8</groupId>
             <artifactId>docker-maven-plugin</artifactId>
             <version>0.15.16</version>
+            <scope>provided</scope>
         </dependency>
 
         <dependency>
@@ -129,6 +114,10 @@
         <dependency>
             <groupId>com.vaadin</groupId>
             <artifactId>vaadin-server</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.vaadin</groupId>
+            <artifactId>vaadin-client-compiled</artifactId>
         </dependency>
         <dependency>
             <groupId>com.vaadin</groupId>
@@ -144,76 +133,41 @@
             <version>4.12</version>
             <scope>test</scope>
         </dependency>
-
-        <dependency>
-            <groupId>org.vaadin.addons</groupId>
-            <artifactId>lucenecontainer</artifactId>
-            <version>1.2.0</version>
-        </dependency>
-
-
     </dependencies>
-
+    <!-- https://mvnrepository.com/artifact/com.typesafe.play/play_2.11 -->
     <build>
-        <resources>
-            <resource>
-                <directory>src/resources</directory>
-            </resource>
-            <resource>
-                <directory>src/webapp</directory>
-            </resource>
-        </resources>
-
         <plugins>
-            <!--<plugin>-->
-            <!--<groupId>org.apache.maven.plugins</groupId>-->
-            <!--<artifactId>maven-dependency-plugin</artifactId>-->
-            <!--<version>2.3</version>-->
-            <!--<executions>-->
-            <!--<execution>-->
-            <!--<phase>package</phase>-->
-            <!--<goals>-->
-            <!--<goal>copy</goal>-->
-            <!--</goals>-->
-            <!--<configuration>-->
-            <!--<artifactItems>-->
-            <!--<artifactItem>-->
-            <!--<groupId>org.eclipse.jetty</groupId>-->
-            <!--<artifactId>jetty-runner</artifactId>-->
-            <!--<version>9.3.3.v20150827</version>-->
-            <!--<destFileName>jetty-runner.jar</destFileName>-->
-            <!--</artifactItem>-->
-            <!--<artifactItem>-->
-
-            <!--</artifactItem>-->
-            <!--</artifactItems>-->
-            <!--</configuration>-->
-            <!--</execution>-->
-            <!--</executions>-->
-            <!--</plugin>-->
-            <!--<plugin>-->
-            <!--<artifactId>maven-assembly-plugin</artifactId>-->
-            <!--<configuration>-->
-
-            <!--<archive>-->
-            <!--<manifest>-->
-            <!--<mainClass>uni.lars.App</mainClass>-->
-            <!--</manifest>-->
-            <!--</archive>-->
-            <!--<descriptorRefs>-->
-            <!--<descriptorRef>jar-with-dependencies</descriptorRef>-->
-            <!--</descriptorRefs>-->
-            <!--</configuration>-->
-            <!--<executions>-->
-            <!--<execution>-->
-            <!--<phase>package</phase>-->
-            <!--<goals>-->
-            <!--<goal>single</goal>-->
-            <!--</goals>-->
-            <!--</execution>-->
-            <!--</executions>-->
-
-            <!--</plugin>-->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>2.3</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>copy</goal>
+                        </goals>
+                        <configuration>
+                            <artifactItems>
+                                <artifactItem>
+                                    <groupId>org.eclipse.jetty</groupId>
+                                    <artifactId>jetty-runner</artifactId>
+                                    <version>9.3.3.v20150827</version>
+                                    <destFileName>jetty-runner.jar</destFileName>
+                                </artifactItem>
+                            </artifactItems>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>2.19.1</version>
+                <configuration>
+                    <skipTests>true</skipTests>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>io.fabric8</groupId>
                 <artifactId>docker-maven-plugin</artifactId>
@@ -262,11 +216,19 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.3</version>
+                <configuration>
+                    <encoding>${project.build.sourceEncoding}</encoding>
+                    <source>${project.source.version}</source>
+                    <target>${project.target.version}</target>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-resources-plugin</artifactId>
                 <version>2.6</version>
+                <configuration>
+                    <encoding>${project.build.sourceEncoding}</encoding>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -299,7 +261,7 @@
                             <goal>update-widgetset</goal>
                             <goal>compile</goal>
                             <!-- Comment out compile-theme goal to use on-the-fly theme compilation -->
-                            <goal>compile-theme</goal>
+                            <!--<goal>compile-theme</goal>-->
                         </goals>
                     </execution>
                 </executions>
@@ -326,9 +288,56 @@
                     </filesets>
                 </configuration>
             </plugin>
-
+            <plugin>
+                <groupId>org.eclipse.jetty</groupId>
+                <artifactId>jetty-maven-plugin</artifactId>
+                <version>${jetty.plugin.version}</version>
+                <configuration>
+                    <scanIntervalSeconds>10</scanIntervalSeconds>
+                    <!--<webAppSourceDirectory>${project.basedir}/src/main/webapp</webAppSourceDirectory>-->
+                    <!--<classesDirectory>${project.build.outputDirectory}</classesDirectory>-->
+                    <!--<war>${project.basedir}/target/mycustom.war</war>-->
+                </configuration>
+            </plugin>
         </plugins>
+        <pluginManagement>
+            <plugins>
+                <!--This plugin's configuration is used to store Eclipse m2e settings only. It has no influence on the Maven build itself.-->
+                <!-- TODO Remove when http://dev.vaadin.com/ticket/14924 is resolved -->
+                <!--<plugin>-->
+                <!--<groupId>org.eclipse.m2e</groupId>-->
+                <!--<artifactId>lifecycle-mapping</artifactId>-->
+                <!--<version>1.0.0</version>-->
+                <!--<configuration>-->
+                <!--<lifecycleMappingMetadata>-->
+                <!--<pluginExecutions>-->
+                <!--<pluginExecution>-->
+                <!--<pluginExecutionFilter>-->
+                <!--<groupId>com.vaadin</groupId>-->
+                <!--<artifactId>-->
+                <!--vaadin-maven-plugin-->
+                <!--</artifactId>-->
+                <!--<versionRange>[7.1.11,)</versionRange>-->
+                <!--<goals>-->
+                <!--<goal>resources</goal>-->
+                <!--<goal>update-widgetset</goal>-->
+                <!--<goal>compile</goal>-->
+                <!--<goal>compile-theme</goal>-->
+                <!--<goal>update-theme</goal>-->
+                <!--</goals>-->
+                <!--</pluginExecutionFilter>-->
+                <!--<action>-->
+                <!--<ignore></ignore>-->
+                <!--</action>-->
+                <!--</pluginExecution>-->
+                <!--</pluginExecutions>-->
+                <!--</lifecycleMappingMetadata>-->
+                <!--</configuration>-->
+                <!--</plugin>-->
+            </plugins>
+        </pluginManagement>
     </build>
+
     <profiles>
         <profile>
             <!-- Vaadin pre-release repositories -->
